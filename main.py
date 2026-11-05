@@ -76,6 +76,6 @@ async def get_verification_code(v:verified,request:Request):
         emailClient=EmailClient()
         emailClient.send_otp_email(recipient_email=v)
         return {
-            "message":f"Verification code sent to {v[0]}*******{v.split("@")[0][-1]}.Check your inbox spam folder."
+            "message":f"Verification code sent to {v[0]}*******{v.split("@")[0][-1]}@{v.split("@")[1]}.Check your inbox spam folder."
         }
 
