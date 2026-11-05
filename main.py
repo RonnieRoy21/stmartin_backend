@@ -72,8 +72,7 @@ verified=Annotated[str,Depends(verify_current_user)]
 
 @admin_router.post("/verification")
 @limiter.limit("10/hour",error_message="Too many requests. Try again after 1 hour")
-@limiter.limit("1/2minutes",error_message="Limit reached,wait for 2 minutes to get another code.")
-async def get_verification_code(v:verified,):
+async def get_verification_code(v:verified,request:Request):
         emailClient=EmailClient()
         emailClient.send_otp_email(recipient_email=v)
         return {
