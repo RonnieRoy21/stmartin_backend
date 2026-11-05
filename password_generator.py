@@ -1,11 +1,13 @@
-import pyotp
-
-_secret = pyotp.random_base32(length=128)
+import pyotp,os
+from dotenv import load_dotenv
 
 
 class PasswordGenerator:
     def __init__(self):
-        self.__secret = _secret
+        load_dotenv()
+        self.__secret = os.getenv("otp_secret")
+        if not self.__secret:
+            raise ValueError
         self.generator = pyotp.TOTP(s=self.__secret, interval=120)
 
     def generate_password(self):
