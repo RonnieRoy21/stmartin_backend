@@ -1,13 +1,6 @@
+
 import os
-import smtplib
-import ssl
-from email.message import EmailMessage
-from smtplib import (
-    SMTPAuthenticationError,
-    SMTPConnectError,
-    SMTPSenderRefused,
-    SMTPServerDisconnected,
-)
+import requests
 
 from dotenv import load_dotenv
 
@@ -18,57 +11,114 @@ from password_generator import PasswordGenerator
 class EmailClient:
     def __init__(self):
         load_dotenv()
-        self.message = EmailMessage()
-        self.port = 587
-        self.host = "smtp.gmail.com"
-        self.sender = os.getenv("sender_email")
-        self.password = os.getenv("sender_password")
+
+        self.api_key = os.getenv("BREVO_API_KEY")
+        self.sender = os.getenv(
+            "BREVO_SENDER",
+            "noreply@fintechnologies.top"
+        )
+        self.sender_name = os.getenv(
+            "BREVO_SENDER_NAME",
+            "Fin Technologies"
+        )
+
+        self.host = "https://api.brevo.com/v3/smtp/email"
+
+        self.headers = {
+            "api-key": self.api_key or "",
+            "accept": "application/json",
+            "content-type": "application/json"
+        }
 
     def send_otp_email(self, recipient_email: str):
-        if not self.sender or not self.password:
-                return CustomResponse(
-                    message="Server Error.", error="Unable to reach Email Server"
-                )
+
+        if not self.api_key or not self.sender:
+            return CustomResponse(
+                message="Server Error.",
+                error="Unable to access Brevo Email Service."
+            )
+
         try:
-            gen=PasswordGenerator()
-            ver_code=gen.generate_password()
+            gen = PasswordGenerator()
+            ver_code = gen.generate_password()
 
-            msg: str = f"""
-            Your Verification Code for St Martin Admin Login is {ver_code}.
+            msg = f"""
+Your Verification Code for St Martin Counsellors Admin Login is:
 
-            The code EXPIRES IN 2 MINUTES.
+{ver_code}
 
-            If you did not request the code you can safely ignore this email.
+The code EXPIRES IN 3 MINUTES.
 
-            This Email is auto-generated.Do not reply.
+If you did not request this code, you can safely ignore this email.
 
-            Thank you,
-            St Martin ICT Team.
+This email is auto-generated. Do not reply.
+
+Thank you,
+Fin Technologies ICT Team.
 """
 
-            with smtplib.SMTP(host=self.host, port=self.port) as server:
-                ctx = ssl.create_default_context()
-                server.ehlo()
-                server.starttls(context=ctx)
-                server.ehlo()
-                server.login(user=self.sender, password=self.password)
-                self.message["To"] = recipient_email
-                self.message["From"] = self.sender
-                self.message["Subject"] = "Admin Verification"
+            payload = {
+                "sender": {
+                    "name": self.sender_name,
+                    "email": self.sender
+                },
+                "to": [
+                    {
+                        "email": recipient_email
+                    }
+                ],
+                "subject": "Admin Verification",
+                "textContent": msg,
+                "replyTo": {
+                    "email": self.sender,
+                    "name": self.sender_name
+                }
+            }
 
-                self.message.set_content(msg)
-                server.send_message(self.message)
-                return CustomResponse(
-                    message=f"An email has been sent by {self.sender}.Check your Email inbox and spam folder if necessary."
+            response = requests.post(
+                self.host,
+                headers=self.headers,
+                json=payload,
+                timeout=15
+            )
+
+            response.raise_for_status()
+
+            return CustomResponse(
+                message=(
+                    f"An email has been sent by {self.sender}. "
+                    "Check your inbox and spam folder if necessary."
                 )
-        except SMTPConnectError as ce:
-            print(f"Error sending email: {ce.winerror}")
-            print(f"Error sending email: {ce.filename}")
-            print(f"Error sending email: {ce.args[0]}")
-            return CustomResponse(message="Error Occured", error="Failed to send OTP")
-        except SMTPServerDisconnected as sd:
-            print(f"Server Disconnected: {sd.args[0]}")
-        except SMTPSenderRefused as sr:
-            print(f"Sender refused :{sr.args}")
-        except SMTPAuthenticationError as ae:
-            print(f"Authentication Error: {ae.args}")
+            )
+
+        except requests.exceptions.Timeout:
+            return CustomResponse(
+                message="Email Service Timeout.",
+                error="Brevo did not respond in time."
+            )
+
+        except requests.exceptions.HTTPError as he:
+            assert he.response is not None
+            print(f"Brevo HTTP Error: {he.response.status_code}")
+            print(f"Brevo Response: {he.response.text}")
+
+            return CustomResponse(
+                message="Error Occurred.",
+                error="Failed to send OTP."
+            )
+
+        except requests.exceptions.RequestException as re:
+            print(f"Brevo Connection Error: {re}")
+
+            return CustomResponse(
+                message="Error Occurred.",
+                error="Unable to connect to Brevo."
+            )
+
+        except Exception as e:
+            print(f"Unexpected Email Error: {e}")
+
+            return CustomResponse(
+                message="Error Occurred.",
+                error="Failed to send OTP."
+            )

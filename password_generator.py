@@ -8,7 +8,7 @@ class PasswordGenerator:
         self.__secret = os.getenv("otp_secret")
         if not self.__secret:
             raise ValueError
-        self.generator = pyotp.TOTP(s=self.__secret, interval=120)
+        self.generator = pyotp.TOTP(s=self.__secret, interval=180)
 
     def generate_password(self):
         try:
