@@ -13,18 +13,13 @@ class EmailClient:
         load_dotenv()
 
         self.api_key = os.getenv("BREVO_API_KEY")
-        self.sender = os.getenv(
-            "BREVO_SENDER",
-        )
-        self.sender_name = os.getenv(
-            "BREVO_SENDER_NAME",
-           
-        )
+        self.sender = os.getenv("BREVO_SENDER")
+        self.sender_name = os.getenv("BREVO_SENDER_NAME" )
 
         self.host = "https://api.brevo.com/v3/smtp/email"
 
         self.headers = {
-            "api-key": self.api_key or "",
+            "api-key": self.api_key,
             "accept": "application/json",
             "content-type": "application/json"
         }
