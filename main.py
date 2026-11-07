@@ -24,8 +24,9 @@ async def rate_limit_handler(
 app.add_middleware(
      CORSMiddleware,
      allow_headers=['Authorization'],
-     allow_origins=["https://stmartincounsellors.vercel.app/"],
+     allow_origins=["https://stmartincounsellors.vercel.app"],
      allow_methods=["POST","GET"],
+     allow_credentials=False
 )
 
 
