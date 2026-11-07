@@ -19,10 +19,7 @@ class PasswordGenerator:
 
     def verify_password(self, code: str):
         try:
-            if self.generator.verify(otp=code):
-                print("Verified")
-                return
-            print("Invalid Code")
+            return self.generator.verify(otp=code)
         except Exception as e:
             print(f"Error verifying code: {e.args}")
             raise

@@ -5,9 +5,12 @@ from slowapi.util import get_remote_address
 from slowapi import Limiter,_rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from email_client import EmailClient
+from password_generator import PasswordGenerator
 from stmartin_supabase import SupabaseDatabase
+from starlette.middleware.cors import CORSMiddleware 
 
-
+app=FastAPI(title="St Marting Admin")
+admin_router=APIRouter(prefix="/admin")
 
 async def rate_limit_handler(
     request: Request,
@@ -18,7 +21,12 @@ async def rate_limit_handler(
 
     raise exc
 
-app=FastAPI(title="St Marting Admin")
+app.add_middleware(
+     CORSMiddleware,
+     allow_headers=['Authorization'],
+     allow_origins=["http://localhost:5173"],
+     allow_methods=["POST","GET"],
+)
 
 
 
@@ -28,7 +36,6 @@ app.add_exception_handler(
     RateLimitExceeded,
     rate_limit_handler
 )
-admin_router=APIRouter(prefix="/admin/auth")
 
 app.include_router(admin_router)
 
@@ -43,7 +50,7 @@ def get_db():
 
 database=Annotated[SupabaseDatabase,Depends(get_db)]
 
-def verify_current_user(db:database,credentials:HTTPAuthorizationCredentials=Depends(bearer),):
+def verify_current_user(db:database,credentials:HTTPAuthorizationCredentials=Depends(bearer)):
     try:
         token=credentials.credentials
         if not token:
@@ -70,12 +77,34 @@ verified=Annotated[str,Depends(verify_current_user)]
 #
 
 
-@admin_router.post("/verification")
-@limiter.limit("10/hour",error_message="Too many requests. Try again after 1 hour")
+@admin_router.get("/verification")
+# @limiter.limit("10/hour",error_message="Too many requests. Try again after 1 hour")
 async def get_verification_code(v:verified,request:Request):
         emailClient=EmailClient()
         emailClient.send_otp_email(recipient_email=v)
         return {
-            "message":f"Verification code sent to {v[0]}*******{v.split("@")[0][-1]}@{v.split("@")[1]}.Check your inbox spam folder."
+            "message":f"Verification code sent to {v[0]}*****{v.split("@")[0][-1]}@{v.split("@")[1]}.Check your inbox spam folder."
         }
 
+
+@admin_router.post("/verify-code/{code}")
+# @limiter.limit("10/hour",error_message="Too many requests. Try again after 1 hour")
+async def verify_admin_code(code:str,request:Request):
+     try:
+        if not code:
+               print("No code given" )
+               raise HTTPException(
+                    detail="Invalid request parameters",
+                    status_code=status.HTTP_400_BAD_REQUEST
+               )
+
+        gen=PasswordGenerator()
+        response=gen.verify_password(code=code)
+        return{
+             "verified":response
+        }
+     except Exception:
+          raise HTTPException(
+               detail="Error Occurred trying to verify code.",
+               status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+          )

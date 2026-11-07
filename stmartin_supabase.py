@@ -18,18 +18,11 @@ class SupabaseDatabase:
             supabase_url=__supabaseUrl, supabase_key=__supabaseKey
         )
 
-    # def login_user(self,email:str,passwd:str):
-    #     try:
-    #         response=self.supabase.auth.sign_in_with_password({'email':email,'password':passwd})
-    #         if response.session:
-    #             return response.session.access_token
 
-    #         return "" 
-    #     except (TypeError,ValueError,Exception):
-    #         raise
-    
     def retrieve_user(self, user_access_token: str):
         try:
+            if not user_access_token:
+                raise ValueError("Token is null")
             user: UserResponse | None = self.supabase.auth.get_user(user_access_token)
             if not user:
                 raise ValueError
@@ -46,7 +39,6 @@ class SupabaseDatabase:
                 userData: CounsellorModel = CounsellorModel.model_validate(
                     response.data
                 )
-
                 return userData
             raise ValueError
         except SupabaseException :
