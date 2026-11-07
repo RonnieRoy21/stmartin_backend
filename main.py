@@ -9,7 +9,7 @@ from password_generator import PasswordGenerator
 from stmartin_supabase import SupabaseDatabase
 from starlette.middleware.cors import CORSMiddleware 
 
-app=FastAPI(title="St Marting Admin")
+app=FastAPI(title="St Martin Admin")
 admin_router=APIRouter(prefix="/admin")
 
 async def rate_limit_handler(
@@ -24,7 +24,7 @@ async def rate_limit_handler(
 app.add_middleware(
      CORSMiddleware,
      allow_headers=['Authorization'],
-     allow_origins=["http://localhost:5173"],
+     allow_origins=["https://stmartincounsellors.vercel.app"],
      allow_methods=["POST","GET"],
 )
 
@@ -78,7 +78,7 @@ verified=Annotated[str,Depends(verify_current_user)]
 
 
 @admin_router.get("/verification")
-# @limiter.limit("10/hour",error_message="Too many requests. Try again after 1 hour")
+@limiter.limit("10/hour",error_message="Too many requests. Try again after 1 hour")
 async def get_verification_code(v:verified,request:Request):
         emailClient=EmailClient()
         emailClient.send_otp_email(recipient_email=v)
@@ -88,7 +88,7 @@ async def get_verification_code(v:verified,request:Request):
 
 
 @admin_router.post("/verify-code/{code}")
-# @limiter.limit("10/hour",error_message="Too many requests. Try again after 1 hour")
+@limiter.limit("10/hour",error_message="Too many requests. Try again after 1 hour")
 async def verify_admin_code(code:str,request:Request):
      try:
         if not code:
