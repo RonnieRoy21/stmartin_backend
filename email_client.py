@@ -15,11 +15,10 @@ class EmailClient:
         self.api_key = os.getenv("BREVO_API_KEY")
         self.sender = os.getenv(
             "BREVO_SENDER",
-            "noreply@fintechnologies.top"
         )
         self.sender_name = os.getenv(
             "BREVO_SENDER_NAME",
-            "Fin Technologies"
+           
         )
 
         self.host = "https://api.brevo.com/v3/smtp/email"
