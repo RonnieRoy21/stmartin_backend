@@ -85,6 +85,7 @@ verified=Annotated[CounsellorModel,Depends(verify_current_user)]
 # 5.fetch schedules
 # 6.fetch counsellorss profiles
 # 7.admin login
+
 #
 
 @admin_router.post("/login")
@@ -149,3 +150,12 @@ async def get_all_schedules(v:verified,db:database):
           raise HTTPException(
                detail=e.args,status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
           )
+
+
+
+
+
+
+
+     ##________________NOTES________________
+     #remove loca host from allowed origins before production

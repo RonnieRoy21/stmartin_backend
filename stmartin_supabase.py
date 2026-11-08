@@ -64,7 +64,7 @@ class SupabaseDatabase:
 
     def getAllSetSchedules(self,):
         try:
-            schedules:list=self.supabase.from_("schedules").select("counsellor_id,day,date,time,month,year,is_cancelled,counsellors(name)").order('date').order('month').execute().data
+            schedules:list=self.supabase.from_("schedules").select("counsellor_id,day,date,time,month,year,is_cancelled,counsellors(name)").order('date').order('month').eq('is_cancelled',False).execute().data
             
             return [ScheduleModel.model_validate(s) for s in schedules]
         except ValidationError:
