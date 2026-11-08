@@ -1,10 +1,12 @@
 import os
 
 from dotenv import load_dotenv
+from pydantic import ValidationError
 from supabase import SupabaseException, create_client
-from supabase_auth import UserResponse
+from supabase_auth import UserResponse,AuthResponse
 
-from models.Counsellor import CounsellorModel
+from models.Counsellor import CounsellorModel, CounsellorProfile
+from models.Schedules import ScheduleModel
 
 
 class SupabaseDatabase:
@@ -18,6 +20,16 @@ class SupabaseDatabase:
             supabase_url=__supabaseUrl, supabase_key=__supabaseKey
         )
 
+    def login_user(self,email:str,password:str):
+        try:
+            res:AuthResponse=self.supabase.auth.sign_in_with_password({'email':email,"password":password})
+            if not  res.user :
+                raise Exception("Invalid Credentials.")
+            if not res.session:
+                raise Exception("Session Expired")
+            return res.session.access_token
+        except SupabaseException:
+            raise
 
     def retrieve_user(self, user_access_token: str):
         try:
@@ -43,3 +55,19 @@ class SupabaseDatabase:
             raise ValueError
         except SupabaseException :
             raise 
+    def getAllCounsellorProfiles(self,user_id:str):
+        try:
+            counsellors:list=self.supabase.from_("counsellors").select("name,email,phone_number,role").neq('id',user_id).execute().data
+            return [CounsellorProfile.model_validate(c) for c in counsellors]
+        except SupabaseException:
+            raise
+
+    def getAllSetSchedules(self,):
+        try:
+            schedules:list=self.supabase.from_("schedules").select("counsellor_id,day,date,time,month,year,is_cancelled,counsellors(name)").order('date').order('month').execute().data
+            
+            return [ScheduleModel.model_validate(s) for s in schedules]
+        except ValidationError:
+            raise
+        except SupabaseException:
+            raise

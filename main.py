@@ -5,6 +5,7 @@ from slowapi.util import get_remote_address
 from slowapi import Limiter,_rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from email_client import EmailClient
+from models.Counsellor import CounsellorModel, LoginModel
 from password_generator import PasswordGenerator
 from stmartin_supabase import SupabaseDatabase
 from starlette.middleware.cors import CORSMiddleware 
@@ -24,7 +25,10 @@ async def rate_limit_handler(
 app.add_middleware(
      CORSMiddleware,
      allow_headers=["*"],
-     allow_origins=["https://stmartincounsellors.vercel.app",],
+     allow_origins=[
+        "https://stmartincounsellors.vercel.app",
+        "http://localhost:5173"
+                    ],
      allow_methods=["*"],
      allow_credentials=False
 )
@@ -57,13 +61,17 @@ def verify_current_user(db:database,credentials:HTTPAuthorizationCredentials=Dep
         if not token:
             raise HTTPException(detail="Not Authenticated",status_code=status.HTTP_401_UNAUTHORIZED)
         user=db.retrieve_user(user_access_token=token)
-        return user.email
+        if user.role != "admin":
+             raise HTTPException(
+                  detail="UnAuthorized Access",status_code=status.HTTP_403_FORBIDDEN
+             )
+        return user
     except (TypeError,ValueError,Exception):
         raise HTTPException(detail="UnAuthorized Access",status_code=status.HTTP_403_FORBIDDEN)
 
 
 
-verified=Annotated[str,Depends(verify_current_user)]
+verified=Annotated[CounsellorModel,Depends(verify_current_user)]
 
 # ______________Flow_________________
 
@@ -74,18 +82,33 @@ verified=Annotated[str,Depends(verify_current_user)]
 # 3.if true generate one time password valid for 90 seconds and return it
 
 # 4receive otp for verification and return {role:"",authorized:""}
+# 5.fetch schedules
+# 6.fetch counsellorss profiles
+# 7.admin login
 #
-#
+
+@admin_router.post("/login")
+#@limiter.limit("10/hour",error_message="Too many attempts.Try again after 1 hour")
+async def login(request:Request,logins:LoginModel,db:database,):
+     try:
+          response=db.login_user(email=logins.email,password=logins.password)
+          return {
+               "token":response
+          }
+     except Exception as e:
+          raise HTTPException(
+               detail=f"Unable to login.{e.args[0]}",
+               status_code=status.HTTP_401_UNAUTHORIZED
+          )
+     
 
 
 @admin_router.get("/verification")
 @limiter.limit("10/hour",error_message="Too many requests. Try again after 1 hour")
 async def get_verification_code(v:verified,request:Request):
         emailClient=EmailClient()
-        emailClient.send_otp_email(recipient_email=v)
-        return {
-            "message":f"Verification code sent to {v[0]}*****{v.split("@")[0][-1]}@{v.split("@")[1]}.Check your inbox spam folder."
-        }
+        response=emailClient.send_otp_email(recipient_email=v.email)
+        return response
 
 
 @admin_router.post("/verify-code/{code}")
@@ -108,4 +131,21 @@ async def verify_admin_code(code:str,request:Request):
           raise HTTPException(
                detail="Error Occurred trying to verify code.",
                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+          )
+
+@admin_router.get("/counsellors/profiles")
+async def get_all_counsellors(v:verified,db:database):
+     try:
+          return db.getAllCounsellorProfiles(user_id=v.id)
+     except Exception as e:
+          raise HTTPException(detail=e.args[0],status_code=status.HTTP_403_FORBIDDEN)
+
+
+@admin_router.get("/counsellors/schedules")
+async def get_all_schedules(v:verified,db:database):
+     try:
+          return db.getAllSetSchedules()
+     except Exception as e:
+          raise HTTPException(
+               detail=e.args,status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
           )
