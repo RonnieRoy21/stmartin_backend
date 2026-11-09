@@ -1,11 +1,14 @@
 import os
 
 from dotenv import load_dotenv
+from postgrest import APIError
 from pydantic import ValidationError
 from supabase import SupabaseException, create_client
 from supabase_auth import UserResponse,AuthResponse
 
+from custom_response import CustomResponse
 from models.Counsellor import CounsellorModel, CounsellorProfile
+from models.Events import EventModel
 from models.Schedules import ScheduleModel
 
 
@@ -30,6 +33,10 @@ class SupabaseDatabase:
             return res.session.access_token
         except SupabaseException:
             raise
+        except APIError:
+            raise
+
+
 
     def retrieve_user(self, user_access_token: str):
         try:
@@ -55,12 +62,20 @@ class SupabaseDatabase:
             raise ValueError
         except SupabaseException :
             raise 
+        except APIError:
+            raise
+
+
     def getAllCounsellorProfiles(self,user_id:str):
         try:
             counsellors:list=self.supabase.from_("counsellors").select("name,email,phone_number,role").neq('id',user_id).execute().data
             return [CounsellorProfile.model_validate(c) for c in counsellors]
         except SupabaseException:
             raise
+        except APIError:
+            raise
+
+
 
     def getAllSetSchedules(self,):
         try:
@@ -71,3 +86,23 @@ class SupabaseDatabase:
             raise
         except SupabaseException:
             raise
+        except APIError:
+            raise
+
+    def uploadEvent(self,e:EventModel):
+        try:
+            self.supabase.from_("events").insert({
+                'name':e.name,
+                'date':e.date,
+                'venue':e.venue,
+                'description':e.descritpion
+            }).execute()
+            return CustomResponse(message="Event Posted")
+        except SupabaseException :
+            raise
+        except ValidationError :
+            raise
+        except APIError:
+            raise
+
+        

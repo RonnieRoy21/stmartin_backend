@@ -6,6 +6,7 @@ from slowapi import Limiter,_rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from email_client import EmailClient
 from models.Counsellor import CounsellorModel, LoginModel
+from models.Events import EventModel
 from password_generator import PasswordGenerator
 from stmartin_supabase import SupabaseDatabase
 from starlette.middleware.cors import CORSMiddleware 
@@ -96,9 +97,9 @@ async def login(request:Request,logins:LoginModel,db:database,):
           return {
                "token":response
           }
-     except Exception as e:
+     except Exception :
           raise HTTPException(
-               detail=f"Unable to login.{e.args[0]}",
+               detail=f"Unable to login.Try again later",
                status_code=status.HTTP_401_UNAUTHORIZED
           )
      
@@ -138,19 +139,28 @@ async def verify_admin_code(code:str,request:Request):
 async def get_all_counsellors(v:verified,db:database):
      try:
           return db.getAllCounsellorProfiles(user_id=v.id)
-     except Exception as e:
-          raise HTTPException(detail=e.args[0],status_code=status.HTTP_403_FORBIDDEN)
+     except Exception :
+          raise HTTPException(detail="Could not load counsellor profiles.Try again later",status_code=status.HTTP_403_FORBIDDEN)
 
 
 @admin_router.get("/counsellors/schedules")
 async def get_all_schedules(v:verified,db:database):
      try:
           return db.getAllSetSchedules()
-     except Exception as e:
+     except Exception :
           raise HTTPException(
-               detail=e.args,status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+               detail="Could not fetch schedules.An error occurred",status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
           )
 
+@admin_router.post("/events/publish")
+async def post_event(v:verified,db:database,event:EventModel):
+     try:
+          return db.uploadEvent(e=event)
+     except Exception :
+          raise HTTPException(
+               detail="Event not posted.Something went wrong",
+               status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+          )
 
 
 
