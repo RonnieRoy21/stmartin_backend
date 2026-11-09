@@ -1,78 +1,75 @@
-from fastapi import FastAPI,Depends,HTTPException,status,APIRouter,Request
-from fastapi.security import HTTPAuthorizationCredentials,HTTPBearer
+from fastapi import FastAPI, Depends, HTTPException, status, APIRouter, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from typing import Annotated
 from slowapi.util import get_remote_address
-from slowapi import Limiter,_rate_limit_exceeded_handler
+from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from email_client import EmailClient
 from models.Counsellor import CounsellorModel, LoginModel
 from models.Events import EventModel
 from password_generator import PasswordGenerator
 from stmartin_supabase import SupabaseDatabase
-from starlette.middleware.cors import CORSMiddleware 
+from starlette.middleware.cors import CORSMiddleware
 
-app=FastAPI(title="St Martin Admin")
-admin_router=APIRouter(prefix="/admin")
+app = FastAPI(title="St Martin Admin")
+admin_router = APIRouter(prefix="/admin")
 
-async def rate_limit_handler(
-    request: Request,
-    exc: Exception
-):
+
+async def rate_limit_handler(request: Request, exc: Exception):
     if isinstance(exc, RateLimitExceeded):
         return _rate_limit_exceeded_handler(request, exc)
 
     raise exc
 
+
 app.add_middleware(
-     CORSMiddleware,
-     allow_headers=["*"],
-     allow_origins=[
-        "https://stmartincounsellors.vercel.app",
-        "http://localhost:5173"
-                    ],
-     allow_methods=["*"],
-     allow_credentials=False
+    CORSMiddleware,
+    allow_headers=["*"],
+    allow_origins=["https://stmartincounsellors.vercel.app", "http://localhost:5173"],
+    allow_methods=["*"],
+    allow_credentials=False,
 )
 
 
-
-limiter=Limiter(key_func=get_remote_address)
-app.state.limiter=limiter
-app.add_exception_handler(
-    RateLimitExceeded,
-    rate_limit_handler
-)
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 
 app.include_router(admin_router)
 
-bearer=HTTPBearer()
-
-
+bearer = HTTPBearer()
 
 
 def get_db():
-    db=SupabaseDatabase()
+    db = SupabaseDatabase()
     yield db
 
-database=Annotated[SupabaseDatabase,Depends(get_db)]
 
-def verify_current_user(db:database,credentials:HTTPAuthorizationCredentials=Depends(bearer)):
+database = Annotated[SupabaseDatabase, Depends(get_db)]
+
+
+def verify_current_user(
+    db: database, credentials: HTTPAuthorizationCredentials = Depends(bearer)
+):
     try:
-        token=credentials.credentials
+        token = credentials.credentials
         if not token:
-            raise HTTPException(detail="Not Authenticated",status_code=status.HTTP_401_UNAUTHORIZED)
-        user=db.retrieve_user(user_access_token=token)
+            raise HTTPException(
+                detail="Not Authenticated", status_code=status.HTTP_401_UNAUTHORIZED
+            )
+        user = db.retrieve_user(user_access_token=token)
         if user.role != "admin":
-             raise HTTPException(
-                  detail="UnAuthorized Access",status_code=status.HTTP_403_FORBIDDEN
-             )
+            raise HTTPException(
+                detail="UnAuthorized Access", status_code=status.HTTP_403_FORBIDDEN
+            )
         return user
-    except (TypeError,ValueError,Exception):
-        raise HTTPException(detail="UnAuthorized Access",status_code=status.HTTP_403_FORBIDDEN)
+    except (TypeError, ValueError, Exception):
+        raise HTTPException(
+            detail="UnAuthorized Access", status_code=status.HTTP_403_FORBIDDEN
+        )
 
 
-
-verified=Annotated[CounsellorModel,Depends(verify_current_user)]
+verified = Annotated[CounsellorModel, Depends(verify_current_user)]
 
 # ______________Flow_________________
 
@@ -89,83 +86,84 @@ verified=Annotated[CounsellorModel,Depends(verify_current_user)]
 
 #
 
+
 @admin_router.post("/login")
-#@limiter.limit("10/hour",error_message="Too many attempts.Try again after 1 hour")
-async def login(request:Request,logins:LoginModel,db:database,):
-     try:
-          response=db.login_user(email=logins.email,password=logins.password)
-          return {
-               "token":response
-          }
-     except Exception :
-          raise HTTPException(
-               detail=f"Unable to login.Try again later",
-               status_code=status.HTTP_401_UNAUTHORIZED
-          )
-     
+# @limiter.limit("10/hour",error_message="Too many attempts.Try again after 1 hour")
+async def login(
+    request: Request,
+    logins: LoginModel,
+    db: database,
+):
+    try:
+        response = db.login_user(email=logins.email, password=logins.password)
+        return {"token": response}
+    except Exception:
+        raise HTTPException(
+            detail=f"Unable to login.Try again later",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
 
 
 @admin_router.get("/verification")
-@limiter.limit("10/hour",error_message="Too many requests. Try again after 1 hour")
-async def get_verification_code(v:verified,request:Request):
-        emailClient=EmailClient()
-        response=emailClient.send_otp_email(recipient_email=v.email)
-        return response
+@limiter.limit("10/hour", error_message="Too many requests. Try again after 1 hour")
+async def get_verification_code(v: verified, request: Request):
+    emailClient = EmailClient()
+    response = emailClient.send_otp_email(recipient_email=v.email)
+    return response
 
 
 @admin_router.post("/verify-code/{code}")
-@limiter.limit("10/hour",error_message="Too many requests. Try again after 1 hour")
-async def verify_admin_code(code:str,request:Request):
-     try:
+@limiter.limit("10/hour", error_message="Too many requests. Try again after 1 hour")
+async def verify_admin_code(code: str, request: Request):
+    try:
         if not code:
-               print("No code given" )
-               raise HTTPException(
-                    detail="Invalid request parameters",
-                    status_code=status.HTTP_400_BAD_REQUEST
-               )
+            print("No code given")
+            raise HTTPException(
+                detail="Invalid request parameters",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
-        gen=PasswordGenerator()
-        response=gen.verify_password(code=code)
-        return{
-             "verified":response
-        }
-     except Exception:
-          raise HTTPException(
-               detail="Error Occurred trying to verify code.",
-               status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-          )
+        gen = PasswordGenerator()
+        response = gen.verify_password(code=code)
+        return {"verified": response}
+    except Exception:
+        raise HTTPException(
+            detail="Error Occurred trying to verify code.",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
 
 @admin_router.get("/counsellors/profiles")
-async def get_all_counsellors(v:verified,db:database):
-     try:
-          return db.getAllCounsellorProfiles(user_id=v.id)
-     except Exception :
-          raise HTTPException(detail="Could not load counsellor profiles.Try again later",status_code=status.HTTP_403_FORBIDDEN)
+async def get_all_counsellors(v: verified, db: database):
+    try:
+        return db.getAllCounsellorProfiles(user_id=v.id)
+    except Exception:
+        raise HTTPException(
+            detail="Could not load counsellor profiles.Try again later",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
 
 
 @admin_router.get("/counsellors/schedules")
-async def get_all_schedules(v:verified,db:database):
-     try:
-          return db.getAllSetSchedules()
-     except Exception :
-          raise HTTPException(
-               detail="Could not fetch schedules.An error occurred",status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-          )
+async def get_all_schedules(v: verified, db: database):
+    try:
+        return db.getAllSetSchedules()
+    except Exception:
+        raise HTTPException(
+            detail="Could not fetch schedules.An error occurred",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
 
 @admin_router.post("/events/publish")
-async def post_event(v:verified,db:database,event:EventModel):
-     try:
-          return db.uploadEvent(e=event)
-     except Exception :
-          raise HTTPException(
-               detail="Event not posted.Something went wrong",
-               status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
-          )
+async def post_event(v: verified, db: database, event: EventModel):
+    try:
+        return db.uploadEvent(e=event)
+    except Exception:
+        raise HTTPException(
+            detail="Event not posted.Something went wrong",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
-
-
-
-
-
-     ##________________NOTES________________
-     #remove loca host from allowed origins before production
+    ##________________NOTES________________
+    # remove loca host from allowed origins before production

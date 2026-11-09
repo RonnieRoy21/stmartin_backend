@@ -1,4 +1,3 @@
-
 import os
 import requests
 
@@ -14,22 +13,21 @@ class EmailClient:
 
         self.api_key = os.getenv("BREVO_API_KEY")
         self.sender = os.getenv("BREVO_SENDER")
-        self.sender_name = os.getenv("BREVO_SENDER_NAME" )
+        self.sender_name = os.getenv("BREVO_SENDER_NAME")
 
         self.host = "https://api.brevo.com/v3/smtp/email"
 
         self.headers = {
             "api-key": self.api_key,
             "accept": "application/json",
-            "content-type": "application/json"
+            "content-type": "application/json",
         }
 
     def send_otp_email(self, recipient_email: str):
 
         if not self.api_key or not self.sender:
             return CustomResponse(
-                message="Server Error.",
-                error="Unable to access Brevo Email Service."
+                message="Server Error.", error="Unable to access Brevo Email Service."
             )
 
         try:
@@ -52,28 +50,15 @@ Fin Technologies ICT Team.
 """
 
             payload = {
-                "sender": {
-                    "name": self.sender_name,
-                    "email": self.sender
-                },
-                "to": [
-                    {
-                        "email": recipient_email
-                    }
-                ],
+                "sender": {"name": self.sender_name, "email": self.sender},
+                "to": [{"email": recipient_email}],
                 "subject": "Admin Verification",
                 "textContent": msg,
-                "replyTo": {
-                    "email": self.sender,
-                    "name": self.sender_name
-                }
+                "replyTo": {"email": self.sender, "name": self.sender_name},
             }
 
             response = requests.post(
-                self.host,
-                headers=self.headers,
-                json=payload,
-                timeout=15
+                self.host, headers=self.headers, json=payload, timeout=15
             )
 
             response.raise_for_status()
@@ -87,8 +72,7 @@ Fin Technologies ICT Team.
 
         except requests.exceptions.Timeout:
             return CustomResponse(
-                message="Email Service Timeout.",
-                error="Brevo did not respond in time."
+                message="Email Service Timeout.", error="Brevo did not respond in time."
             )
 
         except requests.exceptions.HTTPError as he:
@@ -97,22 +81,19 @@ Fin Technologies ICT Team.
             print(f"Brevo Response: {he.response.text}")
 
             return CustomResponse(
-                message="Error Occurred.",
-                error="Failed to send OTP."
+                message="Error Occurred.", error="Failed to send OTP."
             )
 
         except requests.exceptions.RequestException as re:
             print(f"Brevo Connection Error: {re}")
 
             return CustomResponse(
-                message="Error Occurred.",
-                error="Unable to connect to Brevo."
+                message="Error Occurred.", error="Unable to connect to Brevo."
             )
 
         except Exception as e:
             print(f"Unexpected Email Error: {e}")
 
             return CustomResponse(
-                message="Error Occurred.",
-                error="Failed to send OTP."
+                message="Error Occurred.", error="Failed to send OTP."
             )

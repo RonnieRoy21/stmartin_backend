@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from postgrest import APIError
 from pydantic import ValidationError
 from supabase import SupabaseException, create_client
-from supabase_auth import UserResponse,AuthResponse
+from supabase_auth import UserResponse, AuthResponse
 
 from custom_response import CustomResponse
 from models.Counsellor import CounsellorModel, CounsellorProfile
@@ -23,10 +23,12 @@ class SupabaseDatabase:
             supabase_url=__supabaseUrl, supabase_key=__supabaseKey
         )
 
-    def login_user(self,email:str,password:str):
+    def login_user(self, email: str, password: str):
         try:
-            res:AuthResponse=self.supabase.auth.sign_in_with_password({'email':email,"password":password})
-            if not  res.user :
+            res: AuthResponse = self.supabase.auth.sign_in_with_password(
+                {"email": email, "password": password}
+            )
+            if not res.user:
                 raise Exception("Invalid Credentials.")
             if not res.session:
                 raise Exception("Session Expired")
@@ -35,8 +37,6 @@ class SupabaseDatabase:
             raise
         except APIError:
             raise
-
-
 
     def retrieve_user(self, user_access_token: str):
         try:
@@ -60,27 +60,42 @@ class SupabaseDatabase:
                 )
                 return userData
             raise ValueError
-        except SupabaseException :
-            raise 
+        except SupabaseException:
+            raise
         except APIError:
             raise
 
-
-    def getAllCounsellorProfiles(self,user_id:str):
+    def getAllCounsellorProfiles(self, user_id: str):
         try:
-            counsellors:list=self.supabase.from_("counsellors").select("name,email,phone_number,role").neq('id',user_id).execute().data
+            counsellors: list = (
+                self.supabase.from_("counsellors")
+                .select("name,email,phone_number,role")
+                .neq("id", user_id)
+                .execute()
+                .data
+            )
             return [CounsellorProfile.model_validate(c) for c in counsellors]
         except SupabaseException:
             raise
         except APIError:
             raise
 
-
-
-    def getAllSetSchedules(self,):
+    def getAllSetSchedules(
+        self,
+    ):
         try:
-            schedules:list=self.supabase.from_("schedules").select("counsellor_id,day,date,time,month,year,is_cancelled,counsellors(name)").order('date').order('month').eq('is_cancelled',False).execute().data
-            
+            schedules: list = (
+                self.supabase.from_("schedules")
+                .select(
+                    "counsellor_id,day,date,time,month,year,is_cancelled,counsellors(name)"
+                )
+                .order("date")
+                .order("month")
+                .eq("is_cancelled", False)
+                .execute()
+                .data
+            )
+
             return [ScheduleModel.model_validate(s) for s in schedules]
         except ValidationError:
             raise
@@ -89,20 +104,21 @@ class SupabaseDatabase:
         except APIError:
             raise
 
-    def uploadEvent(self,e:EventModel):
+    def uploadEvent(self, e: EventModel):
         try:
-            self.supabase.from_("events").insert({
-                'name':e.name,
-                'date':e.date,
-                'venue':e.venue,
-                'description':e.descritpion
-            }).execute()
+            self.supabase.from_("events").insert(
+                {
+                    "name": e.name,
+                    "time": e.time,
+                    "date": e.date,
+                    "venue": e.venue,
+                    "description": e.description,
+                }
+            ).execute()
             return CustomResponse(message="Event Posted")
-        except SupabaseException :
+        except SupabaseException:
             raise
-        except ValidationError :
+        except ValidationError:
             raise
         except APIError:
             raise
-
-        
