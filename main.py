@@ -25,7 +25,9 @@ async def rate_limit_handler(request: Request, exc: Exception):
 app.add_middleware(
     CORSMiddleware,
     allow_headers=["*"],
-    allow_origins=["https://stmartincounsellors.vercel.app", "http://localhost:5173"],
+    allow_origins=[
+        "https://stmartincounsellors.vercel.app",
+    ],
     allow_methods=["*"],
     allow_credentials=False,
 )
@@ -88,7 +90,7 @@ verified = Annotated[CounsellorModel, Depends(verify_current_user)]
 
 
 @admin_router.post("/login")
-# @limiter.limit("10/hour",error_message="Too many attempts.Try again after 1 hour")
+@limiter.limit("15/hour", error_message="Too many attempts.Try again after 1 hour")
 async def login(
     request: Request,
     logins: LoginModel,
@@ -114,7 +116,7 @@ async def get_verification_code(v: verified, request: Request):
 
 @admin_router.post("/verify-code/{code}")
 @limiter.limit("10/hour", error_message="Too many requests. Try again after 1 hour")
-async def verify_admin_code(code: str, request: Request):
+async def verify_admin_code(code: str, v: verified, request: Request):
     try:
         if not code:
             print("No code given")
